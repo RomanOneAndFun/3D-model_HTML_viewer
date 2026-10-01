@@ -122,4 +122,3 @@ your model that showns when drag mouse left or right with presed left mouse butt
 </body>
 ```
 </body>
-**/
