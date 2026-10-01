@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>3D_Media_form — Babylon.js 3D viewport</title>
+<!-- Babylon.js -->
+<script src="scripts/babylon.js"></script>
+<script src="scripts/babylonjs.loaders.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; background: #0a0a0a; color: #ddd; font-family: "Segoe UI", Arial, sans-serif; }
+  .hint { color: #888; font-size: 13px; margin: 0 0 12px 0; }
+
+  /* ---------- example layout: media forms inside table cells ---------- */
+  .m3d-demo { border-collapse: collapse; margin: 16px auto; }
+  .m3d-demo td { border: 1px solid #2a2a2a; padding: 12px; vertical-align: top; }
+
+  /* ===================== 3D_Media_form ===================== */
+  .m3d-root { position: relative; background: #000; overflow: hidden; user-select: none; box-sizing: border-box; }
+  .m3d-root * { box-sizing: border-box; }
+  .m3d-canvas { width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+
+  /* ---------- Hidden_menu ---------- */
+  .m3d-menu {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 40px;
+    background: rgba(16, 16, 16, 0.55); backdrop-filter: blur(3px);
+    transform: translateY(110%); transition: transform .18s ease;
+    pointer-events: none; z-index: 20;
+  }
+  .m3d-menu.m3d-open { transform: translateY(0); pointer-events: auto; }
+  .m3d-menu img { display: block; width: 20px; height: 20px; }
+
+  /* ---------- Menu_hint: "menu" caption + down arrow (visible while the menu is closed) ---------- */
+  .m3d-menu-hint {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 5px;
+    color: rgba(255,255,255,.85); font-size: 13px; line-height: 20px;
+    padding: 1px 10px; z-index: 19; user-select: none; pointer-events: none;
+    background: rgba(16,16,16,.45); border-radius: 5px 5px 0 0;
+    backdrop-filter: blur(2px);
+    transition: opacity .15s ease;
+  }
+  .m3d-menu-hint img { display: block; width: 20px; height: 20px; }
+  .m3d-menu-hint.m3d-hidden { opacity: 0; }
+
+  /* ---------- Model_stats: rotation/elevation/zoom readout, pops up right above the Hidden_menu ---------- */
+  .m3d-stats {
+    position: absolute; right: 6px; bottom: 44px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+    color: rgba(255,255,255,.9); font-size: 12px; line-height: 15px;
+    text-align: right; z-index: 19; user-select: none; pointer-events: none;
+    padding: 3px 7px; border-radius: 5px;
+    background: rgba(16,16,16,.45); backdrop-filter: blur(2px);
+    transition: opacity .15s ease;
+  }
+  .m3d-stats.m3d-hidden { opacity: 0; }
+
+  /* adaptive text color: on a light form background the glyphs turn black
+     (the hint arrow is a white png — inverted the same way, the backdrops lighten) */
+  .m3d-light-bg .m3d-menu-hint { color: rgba(0,0,0,.88); background: rgba(255,255,255,.5); }
+  .m3d-light-bg .m3d-stats { color: rgba(0,0,0,.88); background: rgba(255,255,255,.5); }
+  .m3d-light-bg .m3d-menu-hint img { filter: invert(1); }
+
+  .m3d-btn { width: 20px; height: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; opacity: .85; }
+  .m3d-btn:hover { opacity: 1; }
+  .m3d-btn:active { opacity: .55; }
+  .m3d-btn img { width: 100%; height: 100%; }
+
+  /* right side: Arrow_button_forward above Arrow_button_backward */
+  .m3d-stack-fb { position: absolute; right: 4px; top: 0; display: flex; flex-direction: column; }
+
+  /* arrow cross (keyboard-style): up on top, left/down/right below */
+  .m3d-cross { position: absolute; right: 44px; top: 0; width: 60px; height: 40px; }
+  .m3d-cross .m3d-btn { position: absolute; }
+
+  /* Rec_button: toggles the Model_stats readout; centered between the file-choosing
+     menu and the arrow cross (kept there by JS, see placeRec),
+     the border is always laid out but only colored while enabled */
+  .m3d-rec {
+    position: absolute; right: 104px; top: 10px; height: 20px; padding: 0 6px;
+    border: 1px solid transparent; border-radius: 3px; background: transparent;
+    color: #eee; font-size: 11px; line-height: 18px; cursor: pointer; opacity: .85;
+    font-family: inherit; user-select: none; white-space: nowrap;
+  }
+  .m3d-rec:hover { opacity: 1; }
+  .m3d-rec:active { opacity: .55; }
+  .m3d-rec.m3d-on { border-color: rgba(255,255,255,.65); }
+  .m3d-light-bg .m3d-rec { color: rgba(0,0,0,.85); }
+  .m3d-light-bg .m3d-rec.m3d-on { border-color: rgba(0,0,0,.65); }
+
+  /* left group: Context_animation_menu + Play_animation_button */
+  .m3d-left { position: absolute; left: 6px; top: 10px; height: 20px; display: flex; align-items: center; gap: 3px; }
+
+  /* dropdown context menus */
+  .m3d-ctx {
+    position: relative; height: 20px; display: flex; align-items: center; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.25); border-radius: 3px;
+    background: rgba(255,255,255,.06); color: #eee; font-size: 12px; line-height: 1;
+  }
+  .m3d-ctx:hover { background: rgba(255,255,255,.12); }
+  .m3d-ctx .m3d-ctx-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; padding: 0 4px; }
+  .m3d-ctx .m3d-ctx-arrow { width: 20px; height: 20px; flex: 0 0 20px; }
+  .m3d-ctx-list {
+    position: absolute; left: 0; bottom: 24px; min-width: 100%; max-height: 180px; overflow-y: auto;
+    background: rgba(20,20,20,.92); border: 1px solid rgba(255,255,255,.25); border-radius: 4px;
+    display: none; padding: 2px 0; z-index: 30;
+  }
+  .m3d-ctx.m3d-open .m3d-ctx-list { display: block; }
+  .m3d-ctx-item { padding: 3px 10px; white-space: nowrap; color: #eee; font-size: 12px; cursor: pointer; }
+  .m3d-ctx-item:hover { background: rgba(255,255,255,.15); }
+  .m3d-ctx-item.m3d-selected { color: #7ec8ff; }
+
+  /* central model-choosing menu */
+  .m3d-model-menu { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); }
+  .m3d-model-menu .m3d-ctx-list { left: 50%; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+
+<!-- ======================= USAGE EXAMPLE =======================
+     3D_Media_form can be called from anywhere in the middle of <body>:
+     the <script> below defines the function, and every later <script>
+     (here — inside table cells) creates its own independent form. -->
+
+<script>
+(function () {
+"use strict";
+
+/* ===================== Helper functions ===================== */
+
+// Placeholder pictures (PNG with alpha channel) used when .png files are missing or fail to load
+function fallbackPic(kind) {
+  const w = (kind === "play") ? 40 : 20, h = 20;
+  const c = document.createElement("canvas");
+  c.width = w * 2; c.height = h * 2;
+  const ctx = c.getContext("2d");
+  ctx.scale(2, 2);
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  const cx = w / 2, cy = h / 2;
+  const angles = { up: 0, forward: 0, right: Math.PI / 2, down: Math.PI, backward: Math.PI, left: -Math.PI / 2 };
+  function arrow(ang, s) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.moveTo(0, -s); ctx.lineTo(s * 0.95, s * 0.75); ctx.lineTo(-s * 0.95, s * 0.75);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  if (kind === "play") arrow(Math.PI / 2, 5.26);              // "play" points right, glyph 10px wide — same as the Stop square
+  else if (kind === "stop") { ctx.fillRect(cx - 5, cy - 5, 10, 10); } // white square
+  else if (kind === "modelArrow" || kind === "animArrow") arrow(Math.PI, 3.5); // dropdown-list arrow
+  else arrow(angles[kind] || 0, 5);
+  return c.toDataURL("image/png");
+}
+
+function setPic(img, url, kind) {
+  img.onerror = function () { img.onerror = null; img.src = fallbackPic(kind); };
+  img.src = url || fallbackPic(kind);
+}
+
+// Validates a background color: accepts "RRGGBB" or "#RRGGBB", returns lowercase hex or the fallback
+function normalizeHexColor(value, fallback) {
+  if (typeof value !== "string") return fallback;
+  const v = value.replace(/^#/, "");
+  return /^[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : fallback;
+}
+
+function el(tag, cls, parent) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function btnWithPic(parent, url, kind, id) {
+  const b = el("button", "m3d-btn", parent);
+  if (id) b.id = id;
+  setPic(el("img", "", b), url, kind);
+  return b;
+}
+
+/* ======================================================================
+   3D_Media_form — embeddable 3D viewport form.
+
+   Input parameters (params):
+     size            [w, h]  — output window size;
+     zoom            number  — camera dolly-in factor, 1 = the maximum at which
+                               the model still fits within its vertical bounds;
+     elevationDeg    number  — camera elevation angle above the horizon (degrees);
+                               any value is accepted, including negatives
+                               (values past +-90 flip to the mirrored angle);
+     rotationDeg     number  — initial model rotation angle around the vertical
+                               axis (degrees); default 0;
+     modelUrl        string  — input model (GLB, FBX, OBJ or STL);
+     modelExt        string  — optional model format ".glb"/".gltf"/".fbx"/".obj"/".stl";
+                               needed when the URL has no file extension
+                               (e.g. a Blob URL); auto-detected from the URL otherwise;
+     backgroundColor string  — form background color in hex form "XXXXXX"
+                               (e.g. "000000", "1a2b3c"); default "000000";
+     showUI          boolean — true  = full interface (Hidden_menu with the model
+                               filename caption, dropdown menus and all buttons);
+                               false = bare 3D form without the interface: no
+                               filename caption and no dropdown menu functions;
+     pics            object  — button pictures, png with alpha channel:
+                               Arrow_button_forward_pic, Arrow_button_backward_pic,
+                               Arrow_button_left_pic, Arrow_button_right_pic,
+                               Arrow_button_up_pic, Arrow_button_down_pic,
+                               Context_model_browse_menu_arrow_pic,
+                               Context_animation_menu_arrow_pic  (20x20),
+                               Play_animation_button_pic, Stop_animation_button_pic (40x20).
+   ====================================================================== */
+function create3DMediaForm(parent, params) {
+  // unique id suffix per instance: the 1st form keeps the plain ids
+  // (Hidden_menu, Arrow_button_forward, ...), the following get "_2", "_3", ...
+  create3DMediaForm.__uid = (create3DMediaForm.__uid || 0) + 1;
+  const idSuffix = create3DMediaForm.__uid > 1 ? "_" + create3DMediaForm.__uid : "";
+
+  const W = params.size[0], H = params.size[1];
+  const zoom = params.zoom || 1;
+  const elevationDeg = (typeof params.elevationDeg === "number") ? params.elevationDeg : 30;
+
+  // Normalize any elevation angle (including negative and beyond +-90 degrees)
+  // into the -90..90 range: values past +-90 flip the camera over to the
+  // equivalent mirrored angle; +-90 exactly is nudged off the degenerate pole
+  function normElev(deg) {
+    let e = ((deg % 360) + 360) % 360; // 0..360
+    if (e > 180) e -= 360;             // -180..180
+    if (e > 90) e = 180 - e;           // 90..180  -> 90..0
+    if (e < -90) e = -180 - e;         // -180..-90 -> 0..-90
+    return BABYLON.Scalar.Clamp(e, -89.9, 89.9);
+  }
+  const rotationDeg = (typeof params.rotationDeg === "number") ? params.rotationDeg : 0;
+  const pics = params.pics || {};
+  const showUI = params.showUI !== false; // true = show the interface, false = bare 3D form
+  const bgHex = normalizeHexColor(params.backgroundColor, "000000");
+
+  // adaptive text color: relative luminance of the background decides
+  // whether the UI captions are white (dark background) or black (light background)
+  const bgLum = (0.2126 * parseInt(bgHex.substr(0, 2), 16) +
+                 0.7152 * parseInt(bgHex.substr(2, 2), 16) +
+                 0.0722 * parseInt(bgHex.substr(4, 2), 16)) / 255;
+  const lightBg = bgLum > 0.55;
+
+  const root = el("div", "m3d-root", parent);
+  root.style.width = W + "px";
+  root.style.height = H + "px";
+  root.style.background = "#" + bgHex; // background color (hex "XXXXXX")
+  if (lightBg) root.classList.add("m3d-light-bg");
+
+  const canvas = el("canvas", "m3d-canvas", root);
+  canvas.width = W; canvas.height = H;
+
+  /* ---------------- Babylon: scene, camera, lights ---------------- */
+  const engine = new BABYLON.Engine(canvas, true, { stencil: true });
+  const scene = new BABYLON.Scene(engine);
+  scene.clearColor = BABYLON.Color4.FromHexString("#" + bgHex + "FF"); // background color (hex "XXXXXX")
+
+  // Initial view: from above at elevationDeg above the horizon, camera on the +Z side
+  const camera = new BABYLON.ArcRotateCamera(
+    "camera",
+    Math.PI / 2,
+    Math.PI / 2 - normElev(elevationDeg) * Math.PI / 180,
+    10, BABYLON.Vector3.Zero(), scene);
+  camera.fov = 0.8;
+  camera.minZ = 0.05;
+  camera.maxZ = 5000;
+  camera.attachControl(canvas, true);
+  // Disable mouse dragging of the camera: model rotation is handled manually,
+  // and the mouse wheel zoom is disabled too (zoom is only via the arrow buttons).
+  camera.inputs.removeByType("ArcRotateCameraPointersInput");
+  camera.inputs.removeByType("ArcRotateCameraMouseWheelInput");
+  camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
+  // free vertical rotation: wide beta limits so the camera may pass the poles
+  camera.lowerBetaLimit = -Number.MAX_VALUE;
+  camera.upperBetaLimit = Number.MAX_VALUE;
+
+  const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0.2, 1, 0.1), scene);
+  hemi.intensity = 0.95;
+  const dirLight = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-0.5, -1, -0.4), scene);
+  dirLight.intensity = 0.6;
+
+  /* ---------------- Model state ---------------- */
+  let modelRoot = null;     // TransformNode wrapper (rotated by the mouse)
+  let glbRoot = null;       // imported model root
+  let animGroups = [];
+  let currentAnim = null;
+  let fitRadius = 10;
+
+  // UI elements exist only when showUI is true
+  let modelMenuLabel = null; // model filename caption in the dropdown menu
+  let menuHintText = null;   // bottom hint caption
+  let animLabel = null;      // animation name caption
+  let animList = null;       // animation dropdown list
+  let modelName = "—";       // name of the currently loaded model
+  let statsElsRef = null;    // Model_stats row elements {rot, elev, zoom}
+
+  function worldBounds(node) {
+    let mn = null, mx = null, any = false;
+    const min = new BABYLON.Vector3(Infinity, Infinity, Infinity);
+    const max = new BABYLON.Vector3(-Infinity, -Infinity, -Infinity);
+    const list = node.getChildMeshes();
+    if (node.getBoundingInfo) list.push(node);
+    list.forEach(function (m) {
+      if (!m.getBoundingInfo) return;
+      m.computeWorldMatrix(true);
+      const bb = m.getBoundingInfo().boundingBox;
+      min.minimizeInPlace(bb.minimumWorld);
+      max.maximizeInPlace(bb.maximumWorld);
+      any = true;
+    });
+    if (!any) return null;
+    return { min: min, max: max };
+  }
+
+  function disposeModel() {
+    animGroups.forEach(function (g) { g.dispose(); });
+    animGroups = []; currentAnim = null;
+    if (glbRoot) { glbRoot.dispose(false, true); glbRoot = null; }
+    if (modelRoot) { modelRoot.dispose(); modelRoot = null; }
+  }
+
+  // The camera dolly-in is maximal while the model still fits its vertical bounds;
+  // the view is then refined so the model's on-screen silhouette is exactly
+  // centered in the viewport (compensating the perspective skew at elevation).
+  function setupCameraFor(bb) {
+    const center = new BABYLON.Vector3(0, (bb.min.y + bb.max.y) / 2, 0);
+    camera.target = center; // assigning target recomputes the angles — so set them explicitly below
+    camera.alpha = Math.PI / 2;
+    camera.beta = Math.PI / 2 - normElev(elevationDeg) * Math.PI / 180;
+    const d = new BABYLON.Vector3(
+      Math.cos(camera.alpha) * Math.sin(camera.beta),
+      Math.cos(camera.beta),
+      Math.sin(camera.alpha) * Math.sin(camera.beta));
+    const f = d.scale(-1); // view direction
+    const right = BABYLON.Vector3.Cross(BABYLON.Vector3.Up(), d).normalize();
+    const up = BABYLON.Vector3.Cross(d, right);
+    const tanHalf = Math.tan(camera.fov / 2);
+
+    // bounding-box corners (world coordinates)
+    const corners = [];
+    [bb.min.x, bb.max.x].forEach(function (x) {
+      [bb.min.y, bb.max.y].forEach(function (y) {
+        [bb.min.z, bb.max.z].forEach(function (z) { corners.push(new BABYLON.Vector3(x, y, z)); });
+      });
+    });
+
+    const cw = canvas.width, ch = canvas.height, aspect = cw / ch;
+
+    // initial dolly-in: exact maximal distance at which every corner stays inside
+    // the frustum (per-axis, aspect-aware; the 0.01 floor guards degenerate models)
+    let need = 0.01;
+    corners.forEach(function (c) {
+      const v0 = c.subtract(center);
+      const along = BABYLON.Vector3.Dot(v0, f);
+      const rC = BABYLON.Vector3.Dot(v0, right);
+      const uC = BABYLON.Vector3.Dot(v0, up);
+      need = Math.max(need,
+        rC / (tanHalf * aspect) - along,
+        -rC / (tanHalf * aspect) - along,
+        uC / tanHalf - along,
+        -uC / tanHalf - along);
+    });
+    fitRadius = need * 1.04;
+    camera.minZ = Math.min(0.05, fitRadius * 0.02); // tiny models need a tiny near plane
+    camera.lowerRadiusLimit = fitRadius * 0.15;
+    camera.upperRadiusLimit = fitRadius * 4;
+    camera.radius = BABYLON.Scalar.Clamp(fitRadius / zoom, camera.lowerRadiusLimit, camera.upperRadiusLimit);
+
+    // refine: shift the model so its screen-space silhouette is exactly centered
+    // (the shift is perpendicular to the view, so the fit above stays valid)
+    const accShift = new BABYLON.Vector3(0, 0, 0);
+    for (let iter = 0; iter < 4; iter++) {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, allInFront = true;
+      corners.forEach(function (c) {
+        const v = c.add(accShift).subtract(camera.target);
+        const alongCam = camera.radius + BABYLON.Vector3.Dot(v, f);
+        if (alongCam < 0.01) { allInFront = false; return; }
+        const rC = BABYLON.Vector3.Dot(v, right);
+        const uC = BABYLON.Vector3.Dot(v, up);
+        const sx = cw / 2 * (1 + rC / (alongCam * tanHalf * aspect));
+        const sy = ch / 2 * (1 - uC / (alongCam * tanHalf));
+        minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
+        minY = Math.min(minY, sy); maxY = Math.max(maxY, sy);
+      });
+      if (!allInFront) break;
+      const dx = (minX + maxX) / 2 - cw / 2; // silhouette center offset, px
+      const dy = (minY + maxY) / 2 - ch / 2;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) break;
+      const pxPerWorld = ch / (2 * camera.radius * tanHalf);
+      accShift.addInPlace(right.scale(-dx / pxPerWorld).add(up.scale(dy / pxPerWorld)));
+    }
+    modelRoot.position.addInPlace(accShift);
+  }
+
+  function loadModel(url, label, pluginExt) {
+    disposeModel();
+    modelName = label || String(url).split("/").pop().split("?")[0] || "model.glb";
+    if (modelMenuLabel) modelMenuLabel.textContent = modelName;
+    if (menuHintText) menuHintText.textContent = modelName; // the bottom hint shows the name of the open model
+    setAnimLabel("—");
+    BABYLON.SceneLoader.ImportMesh("", "", url, scene,
+      function (meshes, psys, skeletons, groups) {
+        glbRoot = meshes[0] || null;
+        modelRoot = new BABYLON.TransformNode("modelRoot", scene);
+        if (glbRoot) glbRoot.parent = modelRoot;
+        modelRoot.rotation.y = rotationDeg * Math.PI / 180; // initial model rotation (rotationDeg input)
+        // STL/OBJ (without .mtl) come without a material; disable back-face culling
+        // so the model stays visible even with wrong vertex winding,
+        // and recompute normals — files may contain zero normals (black faces)
+        if (pluginExt === ".stl" || pluginExt === ".obj") {
+          meshes.forEach(function (m) {
+            if (!m.material) m.material = new BABYLON.StandardMaterial("autoMat", scene);
+            m.material.backFaceCulling = false;
+            const positions = m.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            if (positions) {
+              const normals = [];
+              BABYLON.VertexData.ComputeNormals(positions, m.getIndices(), normals);
+              m.setVerticesData(BABYLON.VertexBuffer.NormalKind, normals);
+            }
+          });
+        }
+        animGroups = groups || [];
+        // center the model: x/z at the viewport center, minY at zero
+        const bb = worldBounds(modelRoot);
+        if (bb) {
+          modelRoot.position.x -= (bb.min.x + bb.max.x) / 2;
+          modelRoot.position.z -= (bb.min.z + bb.max.z) / 2;
+          modelRoot.position.y -= bb.min.y;
+          const bb2 = worldBounds(modelRoot);
+          if (bb2) setupCameraFor(bb2);
+        }
+        setupAnimations();
+      },
+      null,
+      function () { if (modelMenuLabel) modelMenuLabel.textContent = "Load error"; },
+      pluginExt);
+  }
+
+  /* ---------------- Model rotation with the mouse (left/right) ---------------- */
+  let dragging = false, lastX = 0;
+  scene.onPointerObservable.add(function (pi) {
+    const ev = pi.event;
+    if (pi.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+      if (ev.button === 0) {
+        const pick = scene.pick(scene.pointerX, scene.pointerY);
+        if (pick && pick.hit) { dragging = true; lastX = ev.clientX; ev.preventDefault(); }
+      }
+    } else if (pi.type === BABYLON.PointerEventTypes.POINTERUP) {
+      dragging = false;
+    } else if (pi.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+      if (dragging && modelRoot) {
+        const dx = ev.clientX - lastX;
+        lastX = ev.clientX;
+        modelRoot.rotation.y -= dx * 0.01; // left/right around the vertical axis (inverted direction)
+      }
+    }
+  });
+
+  /* ---------------- Camera buttons ---------------- */
+  function stepDolly(k) {
+    camera.radius = BABYLON.Scalar.Clamp(camera.radius * k, camera.lowerRadiusLimit, camera.upperRadiusLimit);
+  }
+  function orbit(dAlphaDeg, dElevDeg) {
+    camera.alpha += dAlphaDeg * Math.PI / 180;
+    // free elevation: no clamping, the camera may pass over the poles
+    camera.beta -= dElevDeg * Math.PI / 180;
+  }
+  // Rotate the model around the vertical axis (same axis as the readout "rotation:")
+  function rotateModel(dDeg) {
+    if (modelRoot) modelRoot.rotation.y += dDeg * Math.PI / 180;
+  }
+
+  /* ===================== Hidden_menu (UI, only when showUI is true) ===================== */
+  if (showUI) {
+    const menu = el("div", "m3d-menu", root);
+    menu.id = "Hidden_menu" + idSuffix;
+
+    // --- left group: Context_animation_menu + Play_animation_button ---
+    const leftGroup = el("div", "m3d-left", menu);
+
+    const animMenu = el("div", "m3d-ctx", leftGroup);
+    animMenu.id = "Context_animation_menu" + idSuffix;
+    animLabel = el("span", "m3d-ctx-label", animMenu); // animation name on the left
+    animLabel.id = "Animation_selector" + idSuffix;
+    animLabel.textContent = "—";
+    setPic(el("img", "m3d-ctx-arrow", animMenu), pics.animArrow, "animArrow"); // dropdown icon on the right
+    animList = el("div", "m3d-ctx-list", animMenu);
+
+    const playBtn = btnWithPic(leftGroup, pics.play, "play", "Play_animation_button" + idSuffix);
+    playBtn.style.width = "20px"; // visible width matches the glyph (the 40x20 png is drawn centered)
+    playBtn.title = "Play animation";
+    const playImg = playBtn.querySelector("img");
+    playImg.style.width = "40px";         // natural width: the glyph is not squeezed
+    playImg.style.height = "20px";
+    playImg.style.marginLeft = "-9px";    // glyph centered in the visible part, equal gaps
+    playImg.style.pointerEvents = "none"; // the transparent part of the img must not block the animation menu
+    playBtn.addEventListener("click", function () {
+      if (!currentAnim) return;
+      if (currentAnim.isPlaying) currentAnim.stop();
+      currentAnim.reset();
+      currentAnim.start(true);
+    });
+
+    const stopBtn = btnWithPic(leftGroup, pics.stop, "stop", "Stop_animation_button" + idSuffix);
+    stopBtn.style.width = "20px";
+    stopBtn.style.marginLeft = "-3px"; // Play and Stop side by side: equal visible gaps
+    stopBtn.style.display = "flex";
+    stopBtn.style.alignItems = "center";
+    stopBtn.style.justifyContent = "center";
+    const stopImg = stopBtn.querySelector("img");
+    stopImg.style.width = "20px";   // picture is a 20x20 square, not stretched
+    stopImg.style.height = "20px";
+    stopBtn.title = "Stop animation";
+    stopBtn.addEventListener("click", function () {
+      if (!currentAnim) return;
+      if (currentAnim.isPlaying) currentAnim.stop();
+      currentAnim.reset();
+    });
+
+    // --- center: Context_model_browse_menu ---
+    const modelMenu = el("div", "m3d-ctx m3d-model-menu", menu);
+    modelMenu.id = "Context_model_browse_menu" + idSuffix;
+    modelMenuLabel = el("span", "m3d-ctx-label", modelMenu);
+    modelMenuLabel.textContent = "—";
+    setPic(el("img", "m3d-ctx-arrow", modelMenu), pics.modelArrow, "modelArrow"); // arrow in the right corner
+    const modelList = el("div", "m3d-ctx-list", modelMenu);
+
+    const chooseItem = el("div", "m3d-ctx-item", modelList);
+    chooseItem.textContent = "Choose model file...";
+    const fileInput = el("input", "", root);
+    fileInput.type = "file";
+    fileInput.accept = ".glb,.gltf,.fbx,.obj,.stl";
+    fileInput.style.display = "none";
+    chooseItem.addEventListener("click", function (e) {
+      e.stopPropagation();
+      fileInput.click();
+    });
+    fileInput.addEventListener("change", function () {
+      const f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      const url = URL.createObjectURL(f);
+      const ext = f.name.toLowerCase().split(".").pop();
+      const pluginExt = { glb: ".glb", gltf: ".gltf", fbx: ".fbx", obj: ".obj", stl: ".stl" }[ext] || ".glb";
+      loadModel(url, f.name, pluginExt);
+      fileInput.value = "";
+    });
+
+    // --- right side: forward above backward ---
+    const stackFb = el("div", "m3d-stack-fb", menu);
+    const fwdB = btnWithPic(stackFb, pics.forward, "forward", "Arrow_button_forward" + idSuffix);
+    fwdB.title = "Zoom in";
+    const backB = btnWithPic(stackFb, pics.backward, "backward", "Arrow_button_backward" + idSuffix);
+    backB.title = "Zoom out";
+
+    // --- arrow cross: 20px to the left of Arrow_button_backward ---
+    const cross = el("div", "m3d-cross", menu);
+    const upB = btnWithPic(cross, pics.up, "up", "Arrow_button_up" + idSuffix);
+    upB.style.left = "20px"; upB.style.top = "0";
+    const leftB = btnWithPic(cross, pics.left, "left", "Arrow_button_left" + idSuffix);
+    leftB.style.left = "0"; leftB.style.top = "20px";
+    const downB = btnWithPic(cross, pics.down, "down", "Arrow_button_down" + idSuffix);
+    downB.style.left = "20px"; downB.style.top = "20px";
+    const rightB = btnWithPic(cross, pics.right, "right", "Arrow_button_right" + idSuffix);
+    rightB.style.left = "40px"; rightB.style.top = "20px";
+
+    // Smooth hold-to-act control: the action repeats while the button is held down
+    function holdButton(btn, action) {
+      let timer = null;
+      const stop = function () {
+        if (timer) { clearInterval(timer); timer = null; }
+      };
+      btn.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        if (timer) return;
+        action();                     // instant first step
+        timer = setInterval(action, 16); // then smooth motion while held
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) {
+        btn.addEventListener(ev, stop);
+      });
+      window.addEventListener("blur", stop);
+    }
+
+    holdButton(upB,    function () { orbit(0, +0.75); });  // ~45 deg/s up
+    holdButton(downB,  function () { orbit(0, -0.75); });  // ~45 deg/s down
+    holdButton(leftB,  function () { rotateModel(-0.75); }); // rotate the model left
+    holdButton(rightB, function () { rotateModel(+0.75); }); // rotate the model right
+    holdButton(fwdB,   function () { stepDolly(0.996); }); // smooth dolly-in
+    holdButton(backB,  function () { stepDolly(1.004); }); // smooth dolly-out
+
+    /* ---------------- Dropdown context menus ---------------- */
+    function closeAllCtx() {
+      [animMenu, modelMenu].forEach(function (m) { m.classList.remove("m3d-open"); });
+    }
+    function toggleCtx(m) {
+      const was = m.classList.contains("m3d-open");
+      closeAllCtx();
+      if (!was) m.classList.add("m3d-open");
+    }
+    animMenu.addEventListener("click", function (e) { e.stopPropagation(); toggleCtx(animMenu); });
+    modelMenu.addEventListener("click", function (e) { e.stopPropagation(); toggleCtx(modelMenu); });
+    menu.addEventListener("click", function (e) { e.stopPropagation(); });
+    document.addEventListener("click", closeAllCtx);
+
+    /* ---------------- Hidden_menu reveal: bottom edge ±10px ---------------- */
+    // Menu_hint: model filename caption with a down arrow; visible while the menu is closed,
+    // replaced by the sliding menu content when it opens.
+    const menuHint = el("div", "m3d-menu-hint", root);
+    menuHint.id = "Menu_hint" + idSuffix;
+    menuHintText = el("span", "", menuHint);
+    menuHintText.textContent = "—"; // name of the open model (filled on load)
+    setPic(el("img", "", menuHint), "", "modelArrow"); // icon is a down arrow, same size as the dropdown arrows
+
+    // --- Model_stats: rotation/elevation/zoom readout, pops up right above the sliding menu ---
+    const stats = el("div", "m3d-stats m3d-hidden", root);
+    stats.id = "Model_stats" + idSuffix;
+    const statsEls = {
+      rot:  el("div", "m3d-stats-row", stats), // "rotation: XXX"
+      elev: el("div", "m3d-stats-row", stats), // "elevation: XXX"
+      zoom: el("div", "m3d-stats-row", stats)  // "zoom: XXX"
+    };
+    statsEls.rot.textContent = "rotation: —";
+    statsEls.elev.textContent = "elevation: —";
+    statsEls.zoom.textContent = "zoom: —";
+    statsElsRef = statsEls; // expose to the render loop
+
+    // --- Rec_button: toggles the Model_stats readout; centered between the
+    // file-choosing menu and the arrow cross; the border shows while enabled ---
+    const recBtn = el("button", "m3d-rec m3d-on", menu);
+    recBtn.id = "Rec_button" + idSuffix;
+    recBtn.textContent = "rec";
+    recBtn.title = "Toggle rotation/elevation/zoom readout";
+    let statsOn = true;
+    recBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      statsOn = !statsOn;
+      recBtn.classList.toggle("m3d-on", statsOn);
+      // apply immediately, respecting the current menu state
+      stats.classList.toggle("m3d-hidden", !statsOn || !menu.classList.contains("m3d-open"));
+    });
+
+    // keep rec exactly midway between the model menu and the arrow cross
+    // (the gap depends on the form width and the model-file name length)
+    function placeRec() {
+      const m = menu.getBoundingClientRect();
+      const mm = modelMenu.getBoundingClientRect();
+      const cr = cross.getBoundingClientRect();
+      const midX = (mm.right + cr.left) / 2 - m.left; // midpoint, menu-relative
+      recBtn.style.right = "auto";
+      recBtn.style.left = Math.round(midX - recBtn.offsetWidth / 2) + "px";
+    }
+    placeRec();
+    window.addEventListener("resize", placeRec);
+    // the model menu width changes when a file is loaded — re-place rec then
+    if (window.MutationObserver && modelMenuLabel) {
+      new MutationObserver(placeRec).observe(modelMenuLabel, { childList: true, characterData: true, subtree: true });
+    }
+
+    function openMenu() {
+      menu.classList.add("m3d-open");
+      menuHint.classList.add("m3d-hidden");
+      stats.classList.toggle("m3d-hidden", !statsOn); // the readout pops up together with the menu
+    }
+    function closeMenu() {
+      menu.classList.remove("m3d-open");
+      menuHint.classList.remove("m3d-hidden");
+      stats.classList.add("m3d-hidden");
+      closeAllCtx();
+    }
+    document.addEventListener("mousemove", function (e) {
+      const r = root.getBoundingClientRect();
+      const fromBottom = r.bottom - e.clientY;
+      const insideX = e.clientX >= r.left && e.clientX <= r.right;
+      const inZone = insideX && fromBottom >= -10 && fromBottom <= 10; // ±10px from the bottom edge
+      if (inZone || menu.contains(e.target)) openMenu();
+      else closeMenu();
+    });
+  }
+
+  /* ---------------- Animations ---------------- */
+  function setAnimLabel(t) {
+    if (!animLabel) return; // no UI — nothing to update
+    animLabel.textContent = t || "—";
+    animLabel.title = t || "—";
+  }
+  function selectAnim(group) {
+    animGroups.forEach(function (g) { if (g !== group) g.stop(); });
+    currentAnim = group;
+    setAnimLabel(group ? group.name : "—");
+    if (!animList) return;
+    Array.prototype.forEach.call(animList.children, function (item) {
+      item.classList.toggle("m3d-selected", group && item.__group === group);
+    });
+  }
+  function addAnimItem(name, group) {
+    const item = el("div", "m3d-ctx-item", animList);
+    item.textContent = name;
+    item.__group = group;
+    item.addEventListener("click", function (e) {
+      e.stopPropagation();
+      selectAnim(group);
+      closeAllCtx();
+    });
+    return item;
+  }
+  function setupAnimations() {
+    // animations must not start playing right after the model loads — only via Play
+    animGroups.forEach(function (g) { g.stop(); g.reset(); });
+    if (!animList) return; // no UI — no animation list to fill
+    animList.innerHTML = "";
+    if (!animGroups.length) {
+      currentAnim = null;
+      addAnimItem("—", null); // no animations
+      setAnimLabel("—");
+      return;
+    }
+    animGroups.forEach(function (g) {
+      addAnimItem(g.name || "animation", g);
+    });
+    selectAnim(animGroups[0]);
+  }
+
+  /* ---------------- Render loop and API ---------------- */
+  // Model_stats values: integer rotation (model), elevation (camera) and zoom,
+  // refreshed every frame — so any control (buttons, drag) updates them dynamically
+  const lastStats = { rot: null, elev: null, zoom: null };
+  function updateStats() {
+    if (!statsElsRef || !modelRoot) return;
+    // Algebraic angle, zeroed upon reaching +-360 (signed modulo keeps the sign):
+    // 370 -> 10, -370 -> -10, 360/-360 -> 0
+    const rot = Math.round(modelRoot.rotation.y * 180 / Math.PI) % 360;
+    const elev = Math.round(90 - camera.beta * 180 / Math.PI) % 360;
+    const zoomPct = Math.round(fitRadius / camera.radius * 100);
+    if (rot !== lastStats.rot)      { statsElsRef.rot.textContent  = "rotation: "  + rot;     lastStats.rot = rot; }
+    if (elev !== lastStats.elev)    { statsElsRef.elev.textContent = "elevation: " + elev;    lastStats.elev = elev; }
+    if (zoomPct !== lastStats.zoom) { statsElsRef.zoom.textContent = "zoom: "      + zoomPct; lastStats.zoom = zoomPct; }
+  }
+  engine.runRenderLoop(function () { scene.render(); updateStats(); });
+  window.addEventListener("resize", function () { engine.resize(); });
+
+  if (params.modelUrl) {
+    // explicit modelExt wins; otherwise the extension is taken from the URL
+    const urlExt = (String(params.modelUrl).split("?")[0].match(/\.(glb|gltf|fbx|obj|stl)$/i) || [])[1];
+    const ext = params.modelExt || (urlExt ? "." + urlExt.toLowerCase() : undefined);
+    loadModel(params.modelUrl, params.modelName, ext);
+  }
+
+  return {
+    root: root,
+    engine: engine,
+    scene: scene,
+    camera: camera,
+    loadModel: loadModel,
+    dispose: function () { disposeModel(); engine.dispose(); root.remove(); }
+  };
+}
+
+/* ======================================================================
+   Public API: create3DMediaForm(container, params) can be called from
+   any later <script> in <body> (including table cells). Each call
+   attaches an independent media form to its own container element.
+   ====================================================================== */
+window.create3DMediaForm = create3DMediaForm; // public API for embedding forms
+window.M3D_PICS = {                           // shared button pictures (each form can also use its own set)
+  forward:     "pics/Arrow_button_forward_pic.png",  // png pictures with alpha channel
+  backward:    "pics/Arrow_button_backward_pic.png", // (built-in placeholders are used if missing)
+  left:        "pics/Arrow_button_left_pic.png",
+  right:       "pics/Arrow_button_right_pic.png",
+  up:          "pics/Arrow_button_up_pic.png",
+  down:        "pics/Arrow_button_down_pic.png",
+  modelArrow:  "pics/Context_model_browse_menu_arrow_pic.png",
+  animArrow:   "pics/Context_animation_menu_arrow_pic.png",
+  play:        "pics/Play_animation_button_pic.png",
+  stop:        "pics/Stop_animation_button_pic.png"
+};
+
+})();
+</script>
+
+<!-- ============================================================
+     Example: a single 3D_Media_form call, no frames around it.
+     The function can be called from anywhere in <body> — see the
+     commented-out table-cell example below.
+     ============================================================ -->
+<div id="media-form-1"></div>
+<script>
+  window.mediaForms = window.mediaForms || [];
+  window.mediaForms.push(create3DMediaForm(document.getElementById("media-form-1"), {
+    size: [480, 300],                 // output window size [w, h]
+    zoom: 1.0,                        // camera dolly-in factor; 1 = maximal within the vertical bounds
+    elevationDeg: 30,                 // camera elevation angle above the horizon
+    rotationDeg: 0,                   // initial model rotation angle (degrees)
+    backgroundColor: "000000",        // form background color, hex "XXXXXX"
+    showUI: true,                     // true = full interface, false = bare 3D form without the UI
+    // input model (GLB). If there is no internet access, choose a file via the bottom menu.
+    modelUrl: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CesiumMan/glTF-Binary/CesiumMan.glb",
+    pics: window.M3D_PICS
+  }));
+</script>
+
+<!-- Secondary calls (commented out): the same function called from table cells
+<table class="m3d-demo">
+  <tr>
+    <td>
+      <div id="media-form-2"></div>
+      <script>
+        window.mediaForms.push(create3DMediaForm(document.getElementById("media-form-2"), {
+          size: [480, 300],
+          zoom: 1.0,
+          elevationDeg: 30,
+          rotationDeg: 0,
+          backgroundColor: "000000",
+          showUI: true,
+          modelUrl: "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Avocado/glTF-Binary/Avocado.glb",
+          pics: window.M3D_PICS
+        }));
+      </script>
+    </td>
+  </tr>
+</table>
+-->
+
+<!-- Bare 3D form with an STL model, showUI: false (commented out)
+<script>
+  (function () {
+    // generate a simple STL cube so the example also works offline
+    let stl = "solid cube\n";
+    const tris = [
+      [[-1,-1,1],[1,-1,1],[1,1,1]], [[-1,-1,1],[1,1,1],[-1,1,1]],
+      [[1,-1,-1],[-1,-1,-1],[-1,1,-1]], [[1,-1,-1],[-1,1,-1],[1,1,-1]],
+      [[-1,-1,-1],[-1,-1,1],[-1,1,1]], [[-1,-1,-1],[-1,1,1],[-1,1,-1]],
+      [[1,-1,1],[1,-1,-1],[1,1,-1]], [[1,-1,1],[1,1,-1],[1,1,1]],
+      [[-1,-1,-1],[1,-1,-1],[1,-1,1]], [[-1,-1,-1],[1,-1,1],[-1,-1,1]],
+      [[-1,1,1],[1,1,1],[1,1,-1]], [[-1,1,1],[1,1,-1],[-1,1,-1]]
+    ];
+    tris.forEach(function (t) {
+      stl += " facet normal 0 0 0\n  outer loop\n" + t.map(function (v) { return "   vertex " + v.join(" ") + "\n"; }).join("") + "  endloop\n endfacet\n";
+    });
+    stl += "endsolid cube\n";
+    const stlUrl = URL.createObjectURL(new Blob([stl], { type: "text/plain" }));
+
+    window.mediaForms.push(create3DMediaForm(document.getElementById("media-form-3"), {
+      size: [480, 300],
+      zoom: 1.0,
+      elevationDeg: 30,
+      backgroundColor: "204060",
+      showUI: false,            // bare 3D form: no filename caption, no dropdown menus
+      modelUrl: stlUrl,
+      modelExt: ".stl",         // blob URLs have no extension — set the format explicitly
+      pics: window.M3D_PICS
+    }));
+  })();
+</script>
+-->
+</body>
+</html>
