@@ -1,4 +1,4 @@
-  This project includes a 3D file viewer based on the Babylon.js script. Babylon.js is a free and open‑source 
+/** This project includes a 3D file viewer based on the Babylon.js script. Babylon.js is a free and open‑source 
 product distributed under the Apache 2.0 license, therefore the Apache 2.0 license is inherited. 
   You can use use this file from-the-box as web 3D-viewer that currently handles GLB, FBX, STL, OBJ formats.
   In addition to using it as is, you can use the js-code in the file to create 3D media forms on your web pages.
@@ -114,3 +114,4 @@ your model that showns when drag mouse left or right with presed left mouse butt
 
 ...
 </body>
+**/
