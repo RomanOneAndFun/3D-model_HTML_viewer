@@ -50,7 +50,7 @@ and main functions block from <body><script>...</script></body> block.
 - Third: You can use function in your own HTML file like this:
 
 1) Example of call of an 3D-viewer function with flows up menu and navigation keys:
-```    
+```   
 <body>
 <script>...</script> //Main js-functions block just copy it to your project 
 ```
@@ -114,6 +114,9 @@ your model that showns when drag mouse left or right with presed left mouse butt
   </tr>
 </table>
 ```
-
+```
+...
+</body>
+```
 </body>
 **/
