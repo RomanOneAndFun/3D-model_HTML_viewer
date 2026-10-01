@@ -1,6 +1,8 @@
   This project includes a 3D file viewer based on the Babylon.js script. Babylon.js is a free and open‑source 
-product distributed under the Apache 2.0 license, therefore the Apache 2.0 license is inherited.<br> 
-  You can use use this file from-the-box as web 3D-viewer that currently handles GLB, FBX, STL, OBJ formats.<br>
+product distributed under the Apache 2.0 license, therefore the Apache 2.0 license is inherited.
+
+  You can use use this file from-the-box as web 3D-viewer that currently handles GLB, FBX, STL, OBJ formats.
+  
   In addition to using it as is, you can use the js-code in the file to create 3D media forms on your web pages.
 The 3D-form is implemented as a function that can be called anywhere in the HTML-document and includes the following 
 input parameters: width, height, zoom, tilt angle, rotation angle, background color, enabling/disabling UI display, 
@@ -11,10 +13,11 @@ them as menu elements.
 Project contains:
 -----------------
 .../<br>
-scripts/babylon.js<br>
-scripts/babylonjs.loaders.min.js<br>
+offline/scripts/babylon.js<br>
+offline/scripts/babylonjs.loaders.min.js<br>
+offline/offline_3DViewer.html<br>
 3D_media_form.html<br>
-offline_3DViewer.html<br>
+
 
 -----------
 How to use:
