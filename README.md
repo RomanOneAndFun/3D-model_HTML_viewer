@@ -1,3 +1,23 @@
+--------------------------------------------
+If you want to help write more helpful code.
+--------------------------------------------
+
+I'm using Verdent. Sign up with my link and send your first prompt in Deck — we each get 40 credits to use in Prime mode.
+
+
+Referral Link: https://www.verdent.ai/download?ref=7BLWQO
+
+
+Referral Code: 7BLWQO
+
+
+Send your first prompt in Deck within 7 days of signing up.
+
+---------------
+Project readme
+---------------
+
+  
   This project includes a 3D file viewer based on the Babylon.js script. Babylon.js is a free and open‑source 
 product distributed under the Apache 2.0 license, therefore the Apache 2.0 license is inherited.
 
